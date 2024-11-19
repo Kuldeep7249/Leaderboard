@@ -6,7 +6,6 @@ const app = express();
 const port = 3001;
 
 app.use(cors());
-
 async function fetchAndSaveData() {
   try {
     console.log('Starting to read input files...');
@@ -77,6 +76,7 @@ async function fetchAndSaveData() {
     console.error('Error processing data:', error);
   }
 }
+
 
 app.get('/data', (req, res) => {
   res.sendFile(__dirname + '/data.json');

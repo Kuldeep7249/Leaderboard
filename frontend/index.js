@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     student.url
                 ].join(',');
             });
-            
+
             const csvContent = [headers.join(','), ...csvRows].join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
@@ -66,9 +66,41 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="p-4 text-green-400">${student.easySolved || 'N/A'}</td>
                     <td class="p-4 text-yellow-400">${student.mediumSolved || 'N/A'}</td>
                     <td class="p-4 text-red-400">${student.hardSolved || 'N/A'}</td>
+                    <td class="p-4">
+                        <button class="pin-btn text-yellow-500" data-roll="${student.roll}">${student.isPinned ? 'Unpin' : 'Pin'}</button>
+                    </td>
                 `;
+
+                
+                row.addEventListener('click', () => {
+                    moveRowToTop(student.roll);
+                });
+
                 leaderboardBody.appendChild(row);
             });
+
+            
+            document.querySelectorAll('.pin-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const roll = e.target.dataset.roll;
+                    const student = filteredData.find(s => s.roll === roll);
+                    student.isPinned = !student.isPinned; 
+                    renderLeaderboard(filteredData); 
+                });
+            });
+        };
+
+      
+        const moveRowToTop = (roll) => {
+            
+            const studentIndex = filteredData.findIndex(student => student.roll === roll);
+            if (studentIndex !== -1) {
+                
+                const student = filteredData.splice(studentIndex, 1)[0];
+        
+                filteredData.unshift(student);
+                renderLeaderboard(filteredData);
+            }
         };
 
         // Filter function
@@ -87,7 +119,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         let sectionDirection = 'asc';
 
         const sortData = (data, field, direction, isNumeric = false) => {
-            return data.sort((a, b) => {
+            // First, sort pinned students to the top
+            const pinnedStudents = data.filter(student => student.isPinned);
+            const nonPinnedStudents = data.filter(student => !student.isPinned);
+
+            // Sort the non-pinned students by the desired field
+            const sortedNonPinned = nonPinnedStudents.sort((a, b) => {
                 const valA = a[field] || (isNumeric ? 0 : 'Z');
                 const valB = b[field] || (isNumeric ? 0 : 'Z');
                 if (isNumeric) {
@@ -98,6 +135,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         : valA.toString().localeCompare(valB.toString());
                 }
             });
+
+            return [...pinnedStudents, ...sortedNonPinned]; // Place pinned students at the top
         };
 
         // Initialize the page
