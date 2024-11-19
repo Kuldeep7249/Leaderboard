@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const response = await fetch("http://localhost:3001/data");
         const data = await response.json();
         let filteredData = [...data]; // Keep original data separate
+        let pinnedData = []; // Array to store pinned rows
         const leaderboardBody = document.getElementById('leaderboard-body');
         const sectionFilter = document.getElementById('section-filter');
 
@@ -34,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     student.url
                 ].join(',');
             });
-
+            
             const csvContent = [headers.join(','), ...csvRows].join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
@@ -50,7 +51,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Function to render the leaderboard
         const renderLeaderboard = (sortedData) => {
             leaderboardBody.innerHTML = '';
-            sortedData.forEach((student, index) => {
+            [...pinnedData, ...sortedData].forEach((student, index) => {  // Render pinned rows first
                 const row = document.createElement('tr');
                 row.classList.add('border-b', 'border-gray-700');
                 row.innerHTML = `
@@ -66,40 +67,22 @@ document.addEventListener('DOMContentLoaded', async () => {
                     <td class="p-4 text-green-400">${student.easySolved || 'N/A'}</td>
                     <td class="p-4 text-yellow-400">${student.mediumSolved || 'N/A'}</td>
                     <td class="p-4 text-red-400">${student.hardSolved || 'N/A'}</td>
-                    <td class="p-4">
-                        <button class="pin-btn text-yellow-500" data-roll="${student.roll}">${student.isPinned ? 'Unpin' : 'Pin'}</button>
-                    </td>
                 `;
-
-                
-                row.addEventListener('click', () => {
-                    moveRowToTop(student.roll);
-                });
-
                 leaderboardBody.appendChild(row);
-            });
 
-            
-            document.querySelectorAll('.pin-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const roll = e.target.dataset.roll;
-                    const student = filteredData.find(s => s.roll === roll);
-                    student.isPinned = !student.isPinned; 
-                    renderLeaderboard(filteredData); 
+                // Add event listener to pin the row when clicked
+                row.addEventListener('click', () => {
+                    pinRow(student);
                 });
             });
         };
 
-      
-        const moveRowToTop = (roll) => {
-            
-            const studentIndex = filteredData.findIndex(student => student.roll === roll);
-            if (studentIndex !== -1) {
-                
-                const student = filteredData.splice(studentIndex, 1)[0];
-        
-                filteredData.unshift(student);
-                renderLeaderboard(filteredData);
+        // Pin function (called when row is clicked)
+        const pinRow = (student) => {
+            // Avoid duplicating pinned rows
+            if (!pinnedData.includes(student)) {
+                pinnedData.push(student);
+                renderLeaderboard(filteredData);  // Re-render with the pinned row at the top
             }
         };
 
@@ -119,12 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         let sectionDirection = 'asc';
 
         const sortData = (data, field, direction, isNumeric = false) => {
-            // First, sort pinned students to the top
-            const pinnedStudents = data.filter(student => student.isPinned);
-            const nonPinnedStudents = data.filter(student => !student.isPinned);
-
-            // Sort the non-pinned students by the desired field
-            const sortedNonPinned = nonPinnedStudents.sort((a, b) => {
+            return data.sort((a, b) => {
                 const valA = a[field] || (isNumeric ? 0 : 'Z');
                 const valB = b[field] || (isNumeric ? 0 : 'Z');
                 if (isNumeric) {
@@ -135,8 +113,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                         : valA.toString().localeCompare(valB.toString());
                 }
             });
-
-            return [...pinnedStudents, ...sortedNonPinned]; // Place pinned students at the top
         };
 
         // Initialize the page
@@ -181,6 +157,84 @@ document.addEventListener('DOMContentLoaded', async () => {
             const sortedData = sortData(filteredData, 'hardSolved', hardSolvedDirection, true);
             renderLeaderboard(sortedData);
         });
+
+        let searchBar = document.getElementById("search-bar");
+
+        searchBar.addEventListener("input", (e) => {
+            let searchedData = [];
+            let inputed_value = e.target.value;
+            for (let currData of data) {
+                if (currData.name.substring(0, inputed_value.length) === inputed_value.toUpperCase()) {
+                    searchedData.push(currData);
+                }
+            }
+
+            renderLeaderboard(searchedData);
+        });
+
+        function getlabelsForChart() {
+            let labels = [];
+            for (let currData of data) {
+                let present = false;
+                for (let label of labels) {
+                    if (label == currData.section) {
+                        present = true;
+                    }
+                }
+                if (!present) {
+                    labels.push(currData.section);
+                }
+            }
+            return labels;
+        }
+
+        function getlabelCnts(labels) {
+            const cnts = new Array(labels.length);
+            cnts.fill(0);
+
+            for (let currData of data) {
+                cnts[labels.indexOf(currData.section)]++;
+            }
+
+            return cnts;
+        }
+
+        function generateRandomColor(len) {
+            let colours = [];
+            let max = 255;
+            let min = 0;
+            for (let i = 0; i < len; ++i) {
+                let randomNum1 = Math.floor(Math.random() * (max - min) + min);
+                let randomNum2 = Math.floor(Math.random() * (max - min) + min);
+                let randomNum3 = Math.floor(Math.random() * (max - min) + min);
+                colours.push("rgb(" + randomNum1.toString() + "," + randomNum2.toString() + "," + randomNum3.toString() + ")")
+            }
+            console.log(colours)
+            return colours;
+        }
+
+        function createChart() {
+            let labels = getlabelsForChart();
+            let labelCnts = getlabelCnts(labels);
+            let randomClrs = generateRandomColor(labels.length);
+            const chartData = {
+                labels: labels,
+                datasets: [{
+                    label: 'My First Dataset',
+                    data: labelCnts,
+                    backgroundColor: randomClrs,
+                    hoverOffset: 4
+                }]
+            }
+
+            new Chart("myChart", {
+                type: 'pie',
+                data: chartData,
+                options: {}
+            });
+        }
+
+        createChart();
 
     } catch (error) {
         console.error('Error fetching data:', error);
